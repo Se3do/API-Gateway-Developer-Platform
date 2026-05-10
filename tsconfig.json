@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "shared" },
+    { "path": "gateway" },
+    { "path": "services/auth-service" },
+    { "path": "services/project-service" },
+    { "path": "services/analytics-service" },
+    { "path": "services/logging-service" }
+  ]
+}
