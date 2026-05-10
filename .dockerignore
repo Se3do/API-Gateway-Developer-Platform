@@ -1,0 +1,13 @@
+node_modules/
+.git/
+.gitignore
+*.md
+.env
+.env.local
+logs/
+coverage/
+.nyc_output/
+tests/
+*.test.ts
+*.spec.ts
+*.tsbuildinfo

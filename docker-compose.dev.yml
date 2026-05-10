@@ -1,0 +1,73 @@
+services:
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./gateway/src:/app/src
+    environment:
+      NODE_ENV: development
+      GATEWAY_PORT: 3000
+      REDIS_URL: redis://redis:6379
+      ACCESS_TOKEN_SECRET: dev-access-token-secret-min-32-chars!!
+      AUTH_SERVICE_URL: http://auth-service:4001
+      PROJECT_SERVICE_URL: http://project-service:4002
+      ANALYTICS_SERVICE_URL: http://analytics-service:4003
+      LOGGING_SERVICE_URL: http://logging-service:4004
+      CORS_ORIGINS: "*"
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "4001:4001"
+    volumes:
+      - ./services/auth-service/src:/app/src
+    environment:
+      NODE_ENV: development
+      AUTH_PORT: 4001
+      DATABASE_URL: postgresql://user:password@postgres-auth:5432/authdb?schema=public
+      ACCESS_TOKEN_SECRET: dev-access-token-secret-min-32-chars!!
+      REFRESH_TOKEN_SECRET: dev-refresh-token-secret-min-32-chars!
+
+  project-service:
+    build:
+      context: ./services/project-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "4002:4002"
+    volumes:
+      - ./services/project-service/src:/app/src
+    environment:
+      NODE_ENV: development
+      PROJECT_PORT: 4002
+      DATABASE_URL: postgresql://user:password@postgres-project:5432/projectdb?schema=public
+
+  analytics-service:
+    build:
+      context: ./services/analytics-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "4003:4003"
+    volumes:
+      - ./services/analytics-service/src:/app/src
+    environment:
+      NODE_ENV: development
+      ANALYTICS_PORT: 4003
+      MONGO_URI: mongodb://mongodb:27017/analytics
+
+  logging-service:
+    build:
+      context: ./services/logging-service
+      dockerfile: Dockerfile.dev
+    ports:
+      - "4004:4004"
+    volumes:
+      - ./services/logging-service/src:/app/src
+    environment:
+      NODE_ENV: development
+      LOGGING_PORT: 4004
+      MONGO_URI: mongodb://mongodb:27017/logging
