@@ -5,12 +5,13 @@ Production-grade distributed API gateway with microservice backend — built wit
 ## Architecture
 
 ```
-┌──────────────┐      ┌─────────────────────────────────────────────────────┐
-│   Client     │─────▶│                  Gateway (:3000)                    │
-└──────────────┘      │  Logger → Auth → API Key → Rate Limiter → Validator │
-                      │  → Cache → Router → Forwarder → Event Emitter       │
-                      │  Socket.IO (/monitor) ◀── Alert Events              │
-                      └───────┬──────────────┬──────────────┬───────────────┘
+┌──────────────┐      ┌──────────────────────────────────────────────────────────┐
+│   Client     │─────▶│                  Gateway (:3000)                         │
+└──────────────┘      │  Swagger → Context → Logger → Auth → API Key → Resolver │
+                      │  → Rate Limiter → Validator → Cache → Routes → Forwarder │
+                      │  → Event Emitter → Error Handler                          │
+                      │  Socket.IO (/monitor) ◀── Alert Events                    │
+                      └───────┬──────────────┬──────────────┬────────────────────┘
                               │              │              │
                     ┌─────────▼──┐   ┌───────▼───────┐   ┌──▼────────────┐
                     │ Auth (:4001)│   │Project (:4002)│   │ Analytics     │
@@ -101,6 +102,47 @@ See `.env.example` for all configuration. Key variables:
 | `REDIS_URL` | No | `redis://localhost:6379` | Gateway |
 | `ALERT_SECRET` | No | `dev-alert-secret-change-in-production` | Gateway, Analytics |
 
+## CORS
+
+The gateway is configured with dynamic origin reflection for development:
+
+- `Access-Control-Allow-Origin` mirrors the requesting origin
+- `Access-Control-Allow-Credentials: true`
+- Allowed headers are dynamically read from the browser's preflight `Access-Control-Request-Headers`
+- Exposed headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `X-Cache`
+
+No additional CORS configuration is needed for development. The Socket.IO server uses the same origin policy.
+
+## Rate Limiting
+
+- **Algorithm:** Sliding window via Redis sorted sets (`ZREMRANGEBYSCORE` / `ZCARD` / `ZADD`)
+- **Window:** 60 seconds
+- **Tiers:**
+
+| Identifier | Default Limit |
+|-----------|--------------|
+| API Key | 1000 req/min |
+| Authenticated user | 100 req/min |
+| IP (unauthenticated) | 20 req/min |
+| Per-route override | Via route config `rateLimit` field |
+
+Response headers on every request:
+
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 42
+X-RateLimit-Reset: 1715299876
+```
+
+On exhaustion: `429 Too Many Requests` with `Retry-After: <seconds>`.
+
+## Cache
+
+- **Scope:** GET requests only, when route config has `cacheTTL > 0`
+- **Backend:** Redis `SETEX`
+- **Cache key:** `cache:GET:/path:<md5(query)>`
+- **Headers:** `X-Cache: HIT` or `X-Cache: MISS`
+
 ## API Reference
 
 All requests go through the Gateway (`http://localhost:3000`), which forwards to backend services. Direct service access is also available on their respective ports.
@@ -111,25 +153,33 @@ All requests go through the Gateway (`http://localhost:3000`), which forwards to
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/health` | — | Gateway health status |
-| GET | `/api/v1/analytics/health` | — | Full system health (all services) |
+| GET | `/health` | Public | Unified health of gateway + all downstream services |
 
 ```bash
 curl http://localhost:3000/health
-# → { "status": "ok", "service": "gateway", "timestamp": "...", "uptime": 123 }
+# → { "status": "ok", "service": "gateway", "timestamp": "...", "uptime": 123,
+#     "services": [ { "name": "auth-service", "status": "ok", "latency": 2 }, ... ] }
 ```
 
 ### Auth Service
 
 All routes: `POST /api/v1/auth/*`
 
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v1/auth/register` | Public | Register a new user |
+| POST | `/api/v1/auth/login` | Public | Login, returns access + refresh tokens |
+| POST | `/api/v1/auth/refresh` | Public | Rotate refresh token |
+| POST | `/api/v1/auth/logout` | Bearer | Revoke refresh token |
+| GET | `/api/v1/auth/profile` | Bearer | Get authenticated user |
+
 #### Register
 ```bash
 curl -X POST http://localhost:3000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"Str0ng!Pass","name":"John Doe"}'
-# → 201 { "user": { "id": "...", "email": "...", "name": "...", "role": "DEVELOPER" },
-#         "accessToken": "...", "refreshToken": "..." }
+# → 201 { "message": "Registration successful",
+#         "user": { "id": "...", "email": "...", "name": "..." } }
 ```
 
 #### Login
@@ -161,21 +211,22 @@ curl -X POST http://localhost:3000/api/v1/auth/logout \
 ```bash
 curl http://localhost:3000/api/v1/auth/profile \
   -H "Authorization: Bearer <token>"
-# → 200 { "id": "...", "email": "...", "name": "...", "role": "DEVELOPER" }
+# → 200 { "id": "...", "email": "...", "name": "..." }
 ```
 
 ### Project Service
 
-All routes require JWT authentication (`Authorization: Bearer <token>`), except `GET /keys/verify`.
+All routes require `Authorization: Bearer <token>`, except `GET /api/v1/keys/verify`.
 
 #### Projects
 
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/v1/projects` | Create project |
-| GET | `/api/v1/projects` | List projects |
+| GET | `/api/v1/projects` | List projects (`page`, `limit`, `sort`, `order`) |
 | GET | `/api/v1/projects/:id` | Get project by ID |
-| PATCH | `/api/v1/projects/:id` | Update project |
+| PUT | `/api/v1/projects/:id` | Replace a project |
+| PATCH | `/api/v1/projects/:id` | Update a project |
 | DELETE | `/api/v1/projects/:id` | Delete project |
 
 ```bash
@@ -223,78 +274,90 @@ curl "http://localhost:3000/api/v1/keys/verify?hash=<sha256-of-key>"
 curl -X POST http://localhost:3000/api/v1/projects/<projectId>/routes \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"method":"GET","path":"/api/v1/users/:id","targetUrl":"http://user-service:4005","rateLimit":100}'
-# → 201 { "id": "...", "method": "GET", "path": "/api/v1/users/:id", ... }
+  -d '{"method":"GET","path":"/users/:id","service":"auth-service","rateLimit":100}'
+# → 201 { "id": "...", "method": "GET", "path": "/users/:id", ... }
 ```
 
 ### Logging Service
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/v1/logs` | — | Ingest single log entry |
-| POST | `/api/v1/logs/batch` | — | Ingest multiple log entries |
-| GET | `/api/v1/logs` | — | Query logs (see params below) |
-| GET | `/api/v1/logs/errors` | — | Get error log entries |
-| GET | `/api/v1/logs/:requestId` | — | Get log by request ID |
+| POST | `/api/v1/logs` | Public | Ingest single log entry |
+| POST | `/api/v1/logs/batch` | Public | Ingest multiple log entries |
+| GET | `/api/v1/logs` | Public | Query logs (`page`, `limit`, `userId`, `statusCode`, `method`, `from`, `to`) |
+| GET | `/api/v1/logs/errors` | Public | Get error log entries |
+| GET | `/api/v1/logs/:requestId` | Public | Get log by request ID |
 
 ```bash
 # Ingest a log
 curl -X POST http://localhost:3000/api/v1/logs \
   -H "Content-Type: application/json" \
-  -d '{"requestId":"req-123","method":"GET","path":"/api/test","statusCode":200,"latency":42,"ip":"127.0.0.1"}'
-# → 201 { "id": "...", "requestId": "req-123", ... }
+  -d '{"requestId":"550e8400-e29b-41d4-a716-446655440000","method":"GET","path":"/api/test","statusCode":200,"latency":42,"ip":"127.0.0.1"}'
+# → 201 { "message": "Log ingested" }
 
 # Query logs
-curl "http://localhost:3000/api/v1/logs?from=2026-01-01&to=2026-12-31&statusCode=200&limit=50&offset=0"
+curl "http://localhost:3000/api/v1/logs?from=2026-01-01T00:00:00Z&statusCode=200&page=1&limit=20"
 ```
 
 ### Analytics Service
 
+All analytics endpoints require `Authorization: Bearer <token>`.
+
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/v1/analytics/summary` | — | Aggregate summary (totals, latency, error rate) |
-| GET | `/api/v1/analytics/requests-over-time` | — | Request count bucketed by hour/day |
-| GET | `/api/v1/analytics/error-rate` | — | Error rate breakdown (4xx vs 5xx) |
-| GET | `/api/v1/analytics/latency` | — | Latency percentiles (p50, p95, p99) |
-| GET | `/api/v1/analytics/top-endpoints` | — | Most requested endpoints |
-| GET | `/api/v1/analytics/top-users` | — | Most active users |
-| GET | `/api/v1/analytics/api-key-usage` | — | API key usage stats |
+| GET | `/api/v1/analytics/summary` | Bearer | Aggregate summary (totals, latency, error rate) |
+| GET | `/api/v1/analytics/requests-over-time` | Bearer | Request count bucketed by hour/day |
+| GET | `/api/v1/analytics/error-rate` | Bearer | Error rate |
+| GET | `/api/v1/analytics/latency` | Bearer | Latency percentiles (p50, p95, p99) |
+| GET | `/api/v1/analytics/top-endpoints` | Bearer | Most requested endpoints |
+| GET | `/api/v1/analytics/top-users` | Bearer | Most active users |
+| GET | `/api/v1/analytics/api-key-usage` | Bearer | API key usage stats |
 
-**Query parameters** (all endpoints): `from` (ISO datetime), `to` (ISO datetime), `interval` (hour/day), `limit` (1-100)
+**Common query parameters** (all optional):
+- `from` / `to` — ISO datetime range (all endpoints)
+- `interval` — `hour` or `day` (only `/requests-over-time`)
+- `limit` — max results, default 10 (only top-* endpoints)
 
 ```bash
-curl "http://localhost:3000/api/v1/analytics/summary?from=2026-01-01T00:00:00Z"
-# → { "totalRequests": 1234, "avgLatency": 45.2, "errorRate": 2.5, "errorCount": 31, ... }
+curl "http://localhost:3000/api/v1/analytics/summary?from=2026-01-01T00:00:00Z" \
+  -H "Authorization: Bearer <token>"
+# → { "totalRequests": 1234, "avgLatency": 45.2, "p95Latency": 120, "totalErrors": 31, ... }
 
-curl "http://localhost:3000/api/v1/analytics/latency"
-# → { "avg": 42.1, "min": 1, "max": 5000, "p50": 35, "p95": 120, "p99": 350 }
+curl "http://localhost:3000/api/v1/analytics/latency" \
+  -H "Authorization: Bearer <token>"
+# → { "p50": 35, "p95": 120, "p99": 350, "avg": 42.1 }
 ```
 
 ### Alert Management
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/alerts/rules` | Create alert rule |
-| GET | `/api/v1/alerts/rules` | List alert rules |
-| GET | `/api/v1/alerts/rules/:id` | Get alert rule |
-| PUT | `/api/v1/alerts/rules/:id` | Update alert rule |
-| DELETE | `/api/v1/alerts/rules/:id` | Delete alert rule |
-| GET | `/api/v1/alerts/events` | List alert events |
-| PUT | `/api/v1/alerts/events/:id/acknowledge` | Acknowledge alert |
+All alert CRUD endpoints require `Authorization: Bearer <token>`.
 
-**Metrics**: `error_rate`, `p95_latency`, `5xx_count`, `request_rate`, `avg_latency`, `error_count`
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v1/alerts/emit` | X-Alert-Secret | Bridge alert event to Socket.IO |
+| POST | `/api/v1/alerts/rules` | Bearer | Create alert rule |
+| GET | `/api/v1/alerts/rules` | Bearer | List alert rules |
+| GET | `/api/v1/alerts/rules/:id` | Bearer | Get alert rule |
+| PUT | `/api/v1/alerts/rules/:id` | Bearer | Update alert rule |
+| DELETE | `/api/v1/alerts/rules/:id` | Bearer | Delete alert rule |
+| GET | `/api/v1/alerts/events` | Bearer | List alert events |
+| PUT | `/api/v1/alerts/events/:id/acknowledge` | Bearer | Acknowledge alert |
+
+**Metrics**: `request_count`, `error_rate`, `latency_p50`, `latency_p95`, `latency_p99`, `uptime`
 
 **Operators**: `gt`, `gte`, `lt`, `lte`, `eq`
 
 ```bash
 # Create alert rule
 curl -X POST http://localhost:3000/api/v1/alerts/rules \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"name":"High error rate","service":"gateway","metric":"error_rate","windowSeconds":300,"threshold":5,"operator":"gt","coolDownSeconds":600}'
 # → 201 { "id": "...", "name": "High error rate", ... }
 
 # List events
-curl "http://localhost:3000/api/v1/alerts/events?severity=critical&limit=10"
+curl "http://localhost:3000/api/v1/alerts/events?severity=critical&limit=10" \
+  -H "Authorization: Bearer <token>"
 # → { "events": [...], "total": 3, "limit": 10, "offset": 0 }
 ```
 
@@ -304,30 +367,34 @@ Connect to `http://localhost:3000/monitor` namespace:
 
 | Event | Direction | Description |
 |-------|-----------|-------------|
-| `request:logged` | Server → Client | Real-time request log entry |
+| `log:entry` | Server → Client | Real-time request log entry |
 | `alert:new` | Server → Client | Alert triggered |
 | `connections:active` | Server → Client | Active connection count update |
 
 ```js
 const socket = io('http://localhost:3000/monitor');
-socket.on('alert:new', (data) => console.log('Alert:', data.message));
-socket.on('request:logged', (data) => console.log('Request:', data.method, data.path));
+socket.on('alert:new', (data) => console.log('Alert:', data));
+socket.on('log:entry', (data) => console.log('Request:', data.method, data.path));
 ```
 
 ## Middleware Pipeline (Gateway)
 
-The gateway applies middleware in this order:
+The gateway applies middleware in this exact order for every request:
 
-1. **Logger** — request logging with correlation ID
-2. **Authenticator** — JWT verification (public paths skip)
-3. **API Key Validator** — SHA-256 hashed key → Redis cache → project-service verify
-4. **Route Config Resolver** — loads route configs from project-service, pattern-matches `:param` paths
-5. **Rate Limiter** — Redis sliding window (sorted sets), per-route limits
-6. **Request Validator** — Zod schema validation by `METHOD:path`
-7. **Response Cacher** — GET-only, Redis SETEX with `res.json` override
-8. **Forwarder** — proxy requests to backend services
-9. **Event Emitter** — async log to logging-service + Socket.IO emit
-10. **Error Handler** — unified error responses
+| Step | Middleware | Description |
+|------|-----------|-------------|
+| 1 | **Swagger UI** | Serves OpenAPI docs at `/api-docs` |
+| 2 | **Request Context** | Injects `requestId` (UUID) and `startTime` |
+| 3 | **Logger** | Requests logging with correlation ID |
+| 4 | **Authenticator** | JWT Bearer token verification (public paths skip) |
+| 5 | **API Key Validator** | SHA-256 hashed key → Redis cache → project-service verify |
+| 6 | **Route Config Resolver** | Loads per-route config (rate limit, cache TTL) from in-memory cache |
+| 7 | **Rate Limiter** | Redis sliding window (sorted sets), per-route limits |
+| 8 | **Request Validator** | Zod schema validation by `METHOD:path` |
+| 9 | **Response Cacher** | GET-only, Redis SETEX with `res.json` override on miss |
+| 10 | **Forwarder** | Proxies matched routes to backend services; falls through to 404 |
+| 11 | **Event Emitter** | On `res.finish` — async POST to logging-service + Socket.IO emit |
+| 12 | **Error Handler** | Catches all errors, returns unified JSON envelope |
 
 ## Project Structure
 
@@ -341,7 +408,7 @@ The gateway applies middleware in this order:
 │       └── types/                   # TypeScript interfaces
 ├── gateway/                         # Express API gateway
 │   ├── src/
-│   │   ├── middleware/              # Pipeline (10 middleware)
+│   │   ├── middleware/              # Pipeline (12 middleware)
 │   │   ├── proxy/                   # HTTP forwarder
 │   │   ├── routes/                  # Health, alert emit
 │   │   ├── services/                # HTTP client, route config, Socket.IO holder
@@ -368,6 +435,9 @@ npx jest --config gateway/jest.config.js
 npx jest --config services/auth-service/jest.config.js
 npx jest --config services/project-service/jest.config.js
 npx jest --config services/logging-service/jest.config.js
+
+# End-to-end tests
+node e2e-test.mjs
 ```
 
 Test stack: Jest + ts-jest + supertest. Mocks: Prisma, Mongoose, ioredis, bcrypt.
@@ -387,7 +457,31 @@ docker compose up -d
 
 ## Monitoring
 
-- Real-time request streaming via Socket.IO (`/monitor` namespace)
+- Real-time request streaming via Socket.IO (`/monitor` namespace) — events `log:entry` and `alert:new`
 - Alert evaluation every 30s (configurable via `ALERT_INTERVAL_MS`)
 - Alert events broadcast on Socket.IO as `alert:new`
-- Full system health: `GET /api/v1/analytics/health`
+- Full system health: `GET /health`
+
+## Error Response Format
+
+All errors return a consistent JSON envelope:
+
+```json
+{
+  "error": "ERROR_CODE",
+  "message": "Human-readable message",
+  "statusCode": 400,
+  "timestamp": "2026-05-10T00:00:00.000Z",
+  "requestId": "uuid"
+}
+```
+
+| HTTP | Code | Meaning |
+|------|------|---------|
+| 400 | `VALIDATION_ERROR` | Request body/params/query failed Zod validation |
+| 401 | `UNAUTHORIZED` | Missing or invalid Bearer token |
+| 401 | `TOKEN_EXPIRED` | Access token expired |
+| 403 | `FORBIDDEN` | Account deactivated |
+| 404 | `NOT_FOUND` | Resource not found |
+| 409 | `CONFLICT` | Resource already exists |
+| 429 | `TOO_MANY_REQUESTS` | Rate limit exceeded |
