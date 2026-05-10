@@ -1,0 +1,14 @@
+FROM node:22-alpine
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY shared/package.json shared/tsconfig.json ./shared/
+COPY gateway/package.json gateway/tsconfig.json ./gateway/
+COPY services/auth-service/package.json services/auth-service/tsconfig.json ./services/auth-service/
+COPY services/project-service/package.json services/project-service/tsconfig.json ./services/project-service/
+COPY services/analytics-service/package.json services/analytics-service/tsconfig.json ./services/analytics-service/
+COPY services/logging-service/package.json services/logging-service/tsconfig.json ./services/logging-service/
+RUN npm ci
+COPY . .
+EXPOSE 3000
+ENV NODE_ENV=development
+CMD ["npx", "tsx", "watch", "gateway/src/index.ts"]

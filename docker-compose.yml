@@ -1,0 +1,173 @@
+services:
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: api-gw-postgres-auth
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: authdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-auth-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d authdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-project:
+    image: postgres:16-alpine
+    container_name: api-gw-postgres-project
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: projectdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg-project-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d projectdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7
+    container_name: api-gw-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: api-gw-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    container_name: api-gw-auth-service
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      NODE_ENV: production
+      AUTH_PORT: 4001
+      DATABASE_URL: postgresql://user:password@postgres-auth:5432/authdb?schema=public
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-dev-access-token-secret-min-32-chars!!}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-dev-refresh-token-secret-min-32-chars!}
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+
+  project-service:
+    build:
+      context: .
+      dockerfile: services/project-service/Dockerfile
+    container_name: api-gw-project-service
+    restart: unless-stopped
+    ports:
+      - "4002:4002"
+    environment:
+      NODE_ENV: production
+      PROJECT_PORT: 4002
+      DATABASE_URL: postgresql://user:password@postgres-project:5432/projectdb?schema=public
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-dev-access-token-secret-min-32-chars!!}
+    depends_on:
+      postgres-project:
+        condition: service_healthy
+
+  analytics-service:
+    build:
+      context: .
+      dockerfile: services/analytics-service/Dockerfile
+    container_name: api-gw-analytics-service
+    restart: unless-stopped
+    ports:
+      - "4003:4003"
+    environment:
+      NODE_ENV: production
+      ANALYTICS_PORT: 4003
+      MONGO_URI: mongodb://mongodb:27017/logging
+      GATEWAY_URL: http://gateway:3000
+      ALERT_SECRET: ${ALERT_SECRET:-dev-alert-secret-change-in-production}
+      AUTH_SERVICE_URL: http://auth-service:4001
+      PROJECT_SERVICE_URL: http://project-service:4002
+      LOGGING_SERVICE_URL: http://logging-service:4004
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  logging-service:
+    build:
+      context: .
+      dockerfile: services/logging-service/Dockerfile
+    container_name: api-gw-logging-service
+    restart: unless-stopped
+    ports:
+      - "4004:4004"
+    environment:
+      NODE_ENV: production
+      LOGGING_PORT: 4004
+      MONGO_URI: mongodb://mongodb:27017/logging
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: api-gw-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      GATEWAY_PORT: 3000
+      REDIS_URL: redis://redis:6379
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-dev-access-token-secret-min-32-chars!!}
+      AUTH_SERVICE_URL: http://auth-service:4001
+      PROJECT_SERVICE_URL: http://project-service:4002
+      ANALYTICS_SERVICE_URL: http://analytics-service:4003
+      LOGGING_SERVICE_URL: http://logging-service:4004
+      CORS_ORIGINS: "*"
+      ALERT_SECRET: ${ALERT_SECRET:-dev-alert-secret-change-in-production}
+    depends_on:
+      auth-service:
+        condition: service_started
+      project-service:
+        condition: service_started
+      analytics-service:
+        condition: service_started
+      logging-service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+volumes:
+  pg-auth-data:
+  pg-project-data:
+  mongo-data:
+  redis-data:
