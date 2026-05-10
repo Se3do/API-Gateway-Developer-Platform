@@ -1,0 +1,31 @@
+{
+  "name": "api-gateway-platform",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "gateway",
+    "services/auth-service",
+    "services/project-service",
+    "services/analytics-service",
+    "services/logging-service"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "clean": "npm run clean --workspaces",
+    "lint": "tsc --noEmit --project tsconfig.json",
+    "test": "npm run test --workspaces --if-present",
+    "dev": "npm run dev --workspaces --if-present",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "prisma:generate": "prisma generate --schema=prisma/schema.prisma"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0"
+  }
+}
