@@ -14,8 +14,17 @@ const PUBLIC_PATHS = [
   '/api/v1/keys/verify',
 ];
 
+const PUBLIC_PATH_PREFIXES = [
+  '/api/v1/logs',
+  '/api/v1/routes',
+  '/api/v1/events',
+];
+
 export function authenticator(req: Request, _res: Response, next: NextFunction) {
   if (PUBLIC_PATHS.includes(req.path)) {
+    return next();
+  }
+  if (PUBLIC_PATH_PREFIXES.some((p) => req.path.startsWith(p))) {
     return next();
   }
 
