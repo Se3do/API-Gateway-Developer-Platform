@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth Service Models ───
+
+enum UserRole {
+  ADMIN
+  DEVELOPER
+  VIEWER
+}
+
+model User {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  passwordHash String
+  name         String
+  role         UserRole       @default(DEVELOPER)
+  active       Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
+
+// ─── Project Service Models ───
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  userId      String
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  apiKeys     ApiKey[]
+  routeConfigs RouteConfig[]
+
+  @@index([userId])
+}
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  keyHash    String    @unique
+  prefix     String
+  name       String
+  projectId  String
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId     String
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+
+  @@index([keyHash])
+  @@index([projectId])
+  @@index([userId])
+}
+
+model RouteConfig {
+  id           String   @id @default(uuid())
+  path         String
+  method       String
+  service      String
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  rateLimit    Int?
+  cacheTTL     Int?
+  authRequired Boolean  @default(true)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([projectId, path, method])
+  @@index([service])
+}
