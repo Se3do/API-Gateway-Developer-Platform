@@ -7,7 +7,6 @@ import { middleware } from './middleware/index.js';
 import { createForwarder } from './proxy/forwarder.js';
 import { createRoutes } from './routes/index.js';
 import { swaggerSpec } from './swagger.js';
-import { config } from './config/index.js';
 import type { RequestContext } from './types/index.js';
 import type { Request, Response, NextFunction } from 'express';
 
@@ -15,12 +14,21 @@ export function createApp(eventEmitter?: (req: Request, res: Response, next: Nex
   const app = express();
 
   app.use(helmet());
-  app.use(cors({
-    origin: config.cors.origins === '*' ? '*' : config.cors.origins.split(','),
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-    credentials: true,
-  }));
+  const corsOptionsDelegate: cors.CorsOptionsDelegate = (req, callback) => {
+    const rh = req.headers['access-control-request-headers'];
+    const allowedHeaders = rh
+      ? (Array.isArray(rh) ? rh : rh.split(',')).map((h: string) => h.trim())
+      : ['Content-Type', 'Authorization'];
+    callback(null, {
+      origin: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders,
+      exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'X-Cache'],
+      credentials: true,
+    });
+  };
+  app.use(cors(corsOptionsDelegate));
+  app.options('*', cors(corsOptionsDelegate));
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true }));
 
