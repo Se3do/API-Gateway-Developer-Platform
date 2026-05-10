@@ -1,14 +1,13 @@
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { createApp } from './app.js';
-import { config } from './config/index.js';
 import { createEventEmitter } from './middleware/event-emitter.js';
 import { setIO } from './services/socket.io.js';
 
 export function createServer() {
   const io = new SocketIOServer({
     cors: {
-      origin: config.cors.origins === '*' ? true : config.cors.origins.split(','),
+      origin: true,
       methods: ['GET', 'POST'],
     },
   });

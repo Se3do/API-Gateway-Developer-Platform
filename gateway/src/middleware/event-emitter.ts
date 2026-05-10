@@ -10,10 +10,10 @@ export function createEventEmitter(monitorNamespace: Namespace) {
       const method = req.method;
       const path = req.originalUrl;
 
-      monitorNamespace.emit('request:complete', { method, path, status: statusCode, latency, userId: req.context?.user?.userId });
+      monitorNamespace.emit('log:entry', { method, path, status: statusCode, latency, userId: req.context?.user?.userId });
 
       if (statusCode >= 400) {
-        monitorNamespace.emit('request:error', { method, path, statusCode, error: statusCode >= 500 ? 'Internal Error' : 'Client Error', userId: req.context?.user?.userId });
+        monitorNamespace.emit('log:error', { method, path, statusCode, error: statusCode >= 500 ? 'Internal Error' : 'Client Error', userId: req.context?.user?.userId });
       }
 
       const logBody = {
