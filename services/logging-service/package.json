@@ -1,0 +1,32 @@
+{
+  "name": "@api-gateway/logging-service",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "jest --passWithNoTests"
+  },
+  "dependencies": {
+    "@api-gateway/shared": "*",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "helmet": "^8.0.0",
+    "mongoose": "^8.8.0",
+    "zod": "^3.24.0",
+    "winston": "^3.15.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.2",
+    "ts-jest": "^29.2.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
