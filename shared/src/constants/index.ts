@@ -1,0 +1,51 @@
+import { UserRole } from '../types/user.types.js';
+
+export const ROLES = {
+  [UserRole.ADMIN]: 3,
+  [UserRole.DEVELOPER]: 2,
+  [UserRole.VIEWER]: 1,
+} as const;
+
+export const DEFAULT_RATE_LIMITS = {
+  USER_AUTHENTICATED: 100,
+  API_KEY: 500,
+  IP_UNAUTHENTICATED: 20,
+  WINDOW_SECONDS: 60,
+} as const;
+
+export const CACHE_DEFAULTS = {
+  DEFAULT_TTL_SECONDS: 60,
+  API_KEY_CACHE_TTL: 300,
+} as const;
+
+export const ERROR_CODES = {
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  BAD_REQUEST: 'BAD_REQUEST',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
+  FORBIDDEN: 'FORBIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+  CONFLICT: 'CONFLICT',
+  TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
+  UPSTREAM_ERROR: 'UPSTREAM_ERROR',
+  PROXY_ERROR: 'PROXY_ERROR',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+} as const;
+
+export const SERVICE_PORTS = {
+  GATEWAY: 3000,
+  AUTH: 4001,
+  PROJECT: 4002,
+  ANALYTICS: 4003,
+  LOGGING: 4004,
+} as const;
+
+export const BCrypt = {
+  SALT_ROUNDS: 12,
+} as const;
+
+export const JWT = {
+  ACCESS_TOKEN_EXPIRY: '15m',
+  REFRESH_TOKEN_EXPIRY_DAYS: 7,
+  REFRESH_TOKEN_BYTES: 40,
+} as const;
