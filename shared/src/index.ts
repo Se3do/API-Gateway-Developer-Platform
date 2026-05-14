@@ -6,3 +6,4 @@ export type { IProject, IRouteConfig } from './types/project.types.js';
 export { ROLES, DEFAULT_RATE_LIMITS, CACHE_DEFAULTS, ERROR_CODES, JWT as JWT_CONSTANTS, BCrypt as BCrypt_CONSTANTS } from './constants/index.js';
 export type { IAlertRule, IAlertEvent, AlertMetric, AlertOperator } from './types/alert.types.js';
 export { ALERT_METRICS, ALERT_OPERATORS } from './types/alert.types.js';
+export { authorize, hasRole, hasAnyRole, hasAllRoles } from './middleware/authorize.js';
