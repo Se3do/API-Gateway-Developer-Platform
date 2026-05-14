@@ -6,6 +6,7 @@ const envSchema = z.object({
   PROJECT_PORT: z.coerce.number().int().positive().default(4002),
   DATABASE_URL: z.string().url(),
   ACCESS_TOKEN_SECRET: z.string().min(32).default('dev-access-token-secret-min-32-chars!!'),
+  WEBHOOK_DISPATCH_SECRET: z.string().min(16).default('change-me-webhook-dispatch-secret'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -24,5 +25,8 @@ export const config = {
   },
   jwt: {
     accessTokenSecret: parsed.data.ACCESS_TOKEN_SECRET,
+  },
+  webhook: {
+    dispatchSecret: parsed.data.WEBHOOK_DISPATCH_SECRET,
   },
 } as const;

@@ -3,7 +3,7 @@ import { AppError } from '@api-gateway/shared';
 import { ZodError } from 'zod';
 import { randomUUID } from 'node:crypto';
 
-export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction) {
+export function errorHandler(err: any, req: Request, res: Response, _next: NextFunction) {
   const requestId = (req as any).context?.requestId || randomUUID();
 
   if (err instanceof ZodError) {

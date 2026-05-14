@@ -15,6 +15,7 @@ const routeTable: RouteEntry[] = [
   { method: 'ALL', pathPattern: '/api/v1/oauth', targetUrl: config.services.auth, authRequired: false },
   { method: 'ALL', pathPattern: '/api/v1/projects', targetUrl: config.services.project, authRequired: true },
   { method: 'ALL', pathPattern: '/api/v1/keys', targetUrl: config.services.project, authRequired: true },
+  { method: 'ALL', pathPattern: '/api/v1/webhooks', targetUrl: config.services.project, authRequired: true },
   { method: 'ALL', pathPattern: '/api/v1/routes', targetUrl: config.services.project, authRequired: false },
   { method: 'ALL', pathPattern: '/api/v1/analytics', targetUrl: config.services.analytics, authRequired: true },
   { method: 'ALL', pathPattern: '/api/v1/logs', targetUrl: config.services.logging, authRequired: false },

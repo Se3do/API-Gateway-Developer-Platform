@@ -7,3 +7,5 @@ export { ROLES, DEFAULT_RATE_LIMITS, CACHE_DEFAULTS, ERROR_CODES, JWT as JWT_CON
 export type { IAlertRule, IAlertEvent, AlertMetric, AlertOperator } from './types/alert.types.js';
 export { ALERT_METRICS, ALERT_OPERATORS } from './types/alert.types.js';
 export { authorize, hasRole, hasAnyRole, hasAllRoles } from './middleware/authorize.js';
+export { WEBHOOK_EVENTS } from './types/webhook.types.js';
+export type { IWebhook, WebhookEvent } from './types/webhook.types.js';
