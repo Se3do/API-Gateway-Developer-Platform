@@ -12,6 +12,7 @@ interface RouteEntry {
 
 const routeTable: RouteEntry[] = [
   { method: 'ALL', pathPattern: '/api/v1/auth', targetUrl: config.services.auth, authRequired: false },
+  { method: 'ALL', pathPattern: '/api/v1/oauth', targetUrl: config.services.auth, authRequired: false },
   { method: 'ALL', pathPattern: '/api/v1/projects', targetUrl: config.services.project, authRequired: true },
   { method: 'ALL', pathPattern: '/api/v1/keys', targetUrl: config.services.project, authRequired: true },
   { method: 'ALL', pathPattern: '/api/v1/routes', targetUrl: config.services.project, authRequired: false },

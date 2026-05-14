@@ -9,6 +9,10 @@ const PUBLIC_PATHS = [
   '/api/v1/auth/register',
   '/api/v1/auth/login',
   '/api/v1/auth/refresh',
+  '/api/v1/auth/verify-email',
+  '/api/v1/auth/forgot-password',
+  '/api/v1/auth/reset-password',
+  '/api/v1/auth/send-verification-email',
   '/api-docs',
   '/api/v1/alerts/emit',
   '/api/v1/keys/verify',
@@ -18,6 +22,7 @@ const PUBLIC_PATH_PREFIXES = [
   '/api/v1/logs',
   '/api/v1/routes',
   '/api/v1/events',
+  '/api/v1/oauth', // OAuth initiate and callback are public
 ];
 
 export function authenticator(req: Request, _res: Response, next: NextFunction) {
@@ -36,7 +41,13 @@ export function authenticator(req: Request, _res: Response, next: NextFunction) 
   try {
     const token = header.split(' ')[1];
     const decoded = jwt.verify(token, config.jwt.accessTokenSecret) as ITokenPayload;
-    req.context.user = decoded;
+    // Attach user to context, ensuring role is preserved
+    req.context = req.context || { requestId: '', startTime: Date.now() };
+    req.context.user = {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role,
+    };
     next();
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {

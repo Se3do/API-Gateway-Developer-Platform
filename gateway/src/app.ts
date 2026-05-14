@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { v4 as uuid } from 'uuid';
 import { middleware } from './middleware/index.js';
+import { readOnlyEnforcer } from './middleware/read-only-enforcer.js';
 import { createForwarder } from './proxy/forwarder.js';
 import { createRoutes } from './routes/index.js';
 import { swaggerSpec } from './swagger.js';
@@ -46,6 +47,7 @@ export function createApp(eventEmitter?: (req: Request, res: Response, next: Nex
 
   app.use(middleware.requestLogger);
   app.use(middleware.authenticator);
+  app.use(readOnlyEnforcer);
   app.use(middleware.apiKeyValidator);
   app.use(middleware.routeConfigResolver);
   app.use(middleware.rateLimiter);
