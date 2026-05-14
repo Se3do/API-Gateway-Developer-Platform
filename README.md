@@ -476,6 +476,53 @@ node e2e-test.mjs
 
 Test stack: Jest + ts-jest + supertest. Mocks: Prisma, Mongoose, ioredis, bcrypt.
 
+## Railway Deployment
+
+### One-time setup
+
+1. Push the repo to GitHub
+2. Create a [Railway](https://railway.app) account and install the GitHub integration
+3. Create a new Railway project → **Deploy from GitHub repo** → select this repo
+4. Add each service as a separate Railway service within the project:
+
+| Service | Dockerfile | Port | Healthcheck | Plugins needed |
+|---------|-----------|------|-------------|----------------|
+| `auth-service` | `services/auth-service/Dockerfile` | 4001 | `/health` | PostgreSQL |
+| `project-service` | `services/project-service/Dockerfile` | 4002 | `/health` | PostgreSQL |
+| `analytics-service` | `services/analytics-service/Dockerfile` | 4003 | `/health` | MongoDB |
+| `logging-service` | `services/logging-service/Dockerfile` | 4004 | `/health` | MongoDB |
+| `gateway` | `gateway/Dockerfile` | 3000 | `/health` | Redis |
+
+5. **In each service's Railway dashboard tab**, set:
+   - Root Directory: `/` (repo root)
+   - Build Command: _(leave empty — Dockerfile handles it)_
+   - Start Command: _(leave empty — Dockerfile handles it)_
+
+6. Add **Railway Plugins** to the project:
+   - **PostgreSQL** — generates `DATABASE_URL` (auth-service, project-service share this via Railway service variables)
+   - **MongoDB** — add external MongoDB Atlas or use Railway's MongoDB plugin
+   - **Redis** — generates `REDIS_URL` (gateway)
+
+### Environment variables
+
+Set these in each service's Railway dashboard (or use **Shared Variables** in Railway project settings):
+
+| Variable | Services | Source |
+|----------|----------|--------|
+| `ACCESS_TOKEN_SECRET` | All | Generate a random 32+ char string |
+| `REFRESH_TOKEN_SECRET` | Auth | Generate a random 32+ char string |
+| `DATABASE_URL` | Auth, Project | Railway PostgreSQL plugin provides this |
+| `MONGO_URI` | Analytics, Logging | External MongoDB Atlas or Railway plugin |
+| `REDIS_URL` | Gateway | Railway Redis plugin provides this |
+| `AUTH_SERVICE_URL` | Gateway, Analytics | `https://auth-service.<railway-domain>` |
+| `PROJECT_SERVICE_URL` | Gateway, Analytics | `https://project-service.<railway-domain>` |
+| `ANALYTICS_SERVICE_URL` | Gateway | `https://analytics-service.<railway-domain>` |
+| `LOGGING_SERVICE_URL` | Gateway, Analytics | `https://logging-service.<railway-domain>` |
+
+Each service gets `${{<service-name>.RAILWAY_PUBLIC_DOMAIN}}` from Railway after it deploys — use Railway's variable referencing to wire them together.
+
+> **Note:** The `.railway/*.toml` files in this repo define the Dockerfile paths for each service — Railway reads these automatically when you connect the repo.
+
 ## Docker Build
 
 ```bash
