@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: api-gateway
+
+resources:
+  - namespace.yml
+  - config.yml
+  - secrets.yml
+  - postgres-auth.yml
+  - postgres-project.yml
+  - mongodb.yml
+  - redis.yml
+  - auth-service.yml
+  - project-service.yml
+  - analytics-service.yml
+  - logging-service.yml
+  - gateway.yml

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma generate --schema=prisma/schema.prisma
+
+      - run: npm run build --workspace=shared
+
+      - run: npm run build --workspaces --if-present
+
+      - run: npx tsc --noEmit --project tsconfig.json
+
+      - run: npm test
+        env:
+          ACCESS_TOKEN_SECRET: ci-access-token-secret-at-least-32-chars!!
+          REFRESH_TOKEN_SECRET: ci-refresh-token-secret-at-least-32-chars!
+          NODE_ENV: test
+          LOG_LEVEL: error

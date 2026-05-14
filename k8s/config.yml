@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: api-gateway
+data:
+  NODE_ENV: production
+  GATEWAY_PORT: "3000"
+  AUTH_PORT: "4001"
+  PROJECT_PORT: "4002"
+  ANALYTICS_PORT: "4003"
+  LOGGING_PORT: "4004"
+  LOG_FORMAT: json
+  LOG_LEVEL: info
+  EMAIL_DRIVER: mock
+  AUTH_SERVICE_URL: http://auth-service:4001
+  PROJECT_SERVICE_URL: http://project-service:4002
+  ANALYTICS_SERVICE_URL: http://analytics-service:4003
+  LOGGING_SERVICE_URL: http://logging-service:4004
+  MONGO_URI: mongodb://mongodb:27017/logging
+  REDIS_URL: redis://redis:6379
+  DATABASE_URL_AUTH: postgresql://user:password@postgres-auth:5432/authdb?schema=public
+  DATABASE_URL_PROJECT: postgresql://user:password@postgres-project:5432/projectdb?schema=public
+  GATEWAY_URL: http://gateway:3000

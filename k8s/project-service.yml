@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: project-service
+  namespace: api-gateway
+spec:
+  ports:
+    - port: 4002
+  selector:
+    app: project-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: project-service
+  namespace: api-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: project-service
+  template:
+    metadata:
+      labels:
+        app: project-service
+    spec:
+      containers:
+        - name: project
+          image: apigateway-project-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4002
+          envFrom:
+            - configMapRef:
+                name: gateway-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: gateway-config
+                  key: DATABASE_URL_PROJECT
+            - name: ACCESS_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gateway-secrets
+                  key: ACCESS_TOKEN_SECRET
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4002
+            initialDelaySeconds: 10
+            periodSeconds: 10

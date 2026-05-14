@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-auth
+  namespace: api-gateway
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: postgres-auth
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-auth
+  namespace: api-gateway
+spec:
+  serviceName: postgres-auth
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-auth
+  template:
+    metadata:
+      labels:
+        app: postgres-auth
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: gateway-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gateway-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: authdb
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          livenessProbe:
+            exec:
+              command: [pg_isready, -U, user, -d, authdb]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi

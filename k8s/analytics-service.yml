@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: api-gateway
+spec:
+  ports:
+    - port: 4003
+  selector:
+    app: analytics-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: api-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+        - name: analytics
+          image: apigateway-analytics-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4003
+          envFrom:
+            - configMapRef:
+                name: gateway-config
+          env:
+            - name: ACCESS_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gateway-secrets
+                  key: ACCESS_TOKEN_SECRET
+            - name: ALERT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gateway-secrets
+                  key: ALERT_SECRET
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4003
+            initialDelaySeconds: 10
+            periodSeconds: 10
