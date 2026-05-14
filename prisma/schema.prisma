@@ -16,16 +16,35 @@ enum UserRole {
 }
 
 model User {
-  id           String         @id @default(uuid())
-  email        String         @unique
-  passwordHash String
-  name         String
-  role         UserRole       @default(DEVELOPER)
-  active       Boolean        @default(true)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id                           String         @id @default(uuid())
+  email                        String         @unique
+  passwordHash                 String
+  name                         String
+  role                         UserRole       @default(DEVELOPER)
+  active                       Boolean        @default(true)
+  
+  // OAuth
+  googleId                     String?        @unique
+  githubId                     String?        @unique
+  
+  // Email verification
+  emailVerifiedAt              DateTime?
+  verificationToken            String?        @unique
+  verificationTokenExpiresAt   DateTime?
+  
+  // Password reset
+  resetToken                   String?        @unique
+  resetTokenExpiresAt          DateTime?
+  
+  createdAt                    DateTime       @default(now())
+  updatedAt                    DateTime       @updatedAt
 
   refreshTokens RefreshToken[]
+
+  @@index([googleId])
+  @@index([githubId])
+  @@index([verificationToken])
+  @@index([resetToken])
 }
 
 model RefreshToken {
