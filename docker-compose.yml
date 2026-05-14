@@ -77,6 +77,21 @@ services:
       DATABASE_URL: postgresql://user:password@postgres-auth:5432/authdb?schema=public
       ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-dev-access-token-secret-min-32-chars!!}
       REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-dev-refresh-token-secret-min-32-chars!}
+      # OAuth (optional)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/v1/oauth/google/callback}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_REDIRECT_URI: ${GITHUB_REDIRECT_URI:-http://localhost:3000/api/v1/oauth/github/callback}
+      # Email / SMTP (optional — defaults to mock)
+      EMAIL_DRIVER: ${EMAIL_DRIVER:-mock}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@api-gateway.local}
     depends_on:
       postgres-auth:
         condition: service_healthy
