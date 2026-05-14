@@ -2,8 +2,10 @@ process.env.MONGO_URI = 'mongodb://localhost:27017/test';
 process.env.LOGGING_PORT = '4004';
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'error';
+process.env.ACCESS_TOKEN_SECRET = 'test-access-token-secret-at-least-32-chars!!';
 
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 
 const mockLogEntry = {
   requestId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -43,6 +45,12 @@ jest.mock('mongoose', () => {
 
 import { createApp } from '../src/app.js';
 
+const testToken = jwt.sign(
+  { userId: 'test-user', email: 'test@example.com', role: 'VIEWER' },
+  process.env.ACCESS_TOKEN_SECRET!,
+  { expiresIn: '1h' },
+);
+
 describe('Logging Service', () => {
   let app: ReturnType<typeof createApp>;
 
@@ -72,28 +80,28 @@ describe('Logging Service', () => {
 
   describe('GET /api/v1/logs', () => {
     it('queries logs', async () => {
-      const res = await request(app).get('/api/v1/logs');
+      const res = await request(app).get('/api/v1/logs').set('Authorization', `Bearer ${testToken}`);
       expect(res.status).toBe(200);
       expect(res.body.entries).toHaveLength(1);
       expect(res.body.total).toBe(1);
     });
 
     it('paginates results', async () => {
-      const res = await request(app).get('/api/v1/logs?page=1&limit=10');
+      const res = await request(app).get('/api/v1/logs?page=1&limit=10').set('Authorization', `Bearer ${testToken}`);
       expect(res.status).toBe(200);
     });
   });
 
   describe('GET /api/v1/logs/errors', () => {
     it('returns error logs', async () => {
-      const res = await request(app).get('/api/v1/logs/errors');
+      const res = await request(app).get('/api/v1/logs/errors').set('Authorization', `Bearer ${testToken}`);
       expect(res.status).toBe(200);
     });
   });
 
   describe('GET /api/v1/logs/:requestId', () => {
     it('returns a log entry by requestId', async () => {
-      const res = await request(app).get('/api/v1/logs/a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+      const res = await request(app).get('/api/v1/logs/a1b2c3d4-e5f6-7890-abcd-ef1234567890').set('Authorization', `Bearer ${testToken}`);
       expect(res.status).toBe(200);
     });
 
