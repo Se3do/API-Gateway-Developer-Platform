@@ -4,8 +4,9 @@ import helmet from 'helmet';
 import { PrismaClient } from '@prisma/client';
 import { createRoutes } from './routes/index.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { EmailService } from './services/email.service.js';
 
-export function createApp(prisma: PrismaClient): express.Application {
+export function createApp(prisma: PrismaClient, emailService?: EmailService): express.Application {
   const app = express();
 
   app.use(helmet());
@@ -20,7 +21,7 @@ export function createApp(prisma: PrismaClient): express.Application {
     });
   });
 
-  app.use(createRoutes(prisma));
+  app.use(createRoutes(prisma, emailService));
   app.use(errorHandler);
 
   return app;

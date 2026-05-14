@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { createApp } from './app.js';
 import { config } from './config/index.js';
+import { createEmailService } from './services/email.service.js';
 
 const prisma = new PrismaClient();
 
@@ -8,7 +9,9 @@ async function main() {
   await prisma.$connect();
   console.log('Connected to PostgreSQL');
 
-  const app = createApp(prisma);
+  const emailService = createEmailService();
+
+  const app = createApp(prisma, emailService);
 
   const server = app.listen(config.port, () => {
     console.log(`Auth service running on port ${config.port} [${config.env}]`);
