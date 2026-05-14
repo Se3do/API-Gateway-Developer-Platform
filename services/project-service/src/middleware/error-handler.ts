@@ -3,7 +3,7 @@ import { AppError } from '@api-gateway/shared';
 import { ZodError } from 'zod';
 import { v4 as uuid } from 'uuid';
 
-export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction) {
+export function errorHandler(err: any, req: Request, res: Response, _next: NextFunction) {
   const requestId = (req as any).context?.requestId || uuid();
 
   if (err instanceof ZodError) {
