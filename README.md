@@ -172,6 +172,10 @@ All routes: `POST /api/v1/auth/*`
 | POST | `/api/v1/auth/refresh` | Public | Rotate refresh token |
 | POST | `/api/v1/auth/logout` | Bearer | Revoke refresh token |
 | GET | `/api/v1/auth/profile` | Bearer | Get authenticated user |
+| POST | `/api/v1/auth/send-verification-email` | Public | Send verification email |
+| GET | `/api/v1/auth/verify-email` | Public | Verify email with token |
+| POST | `/api/v1/auth/forgot-password` | Public | Request password reset email |
+| POST | `/api/v1/auth/reset-password` | Public | Reset password with token |
 
 #### Register
 ```bash
@@ -212,6 +216,36 @@ curl -X POST http://localhost:3000/api/v1/auth/logout \
 curl http://localhost:3000/api/v1/auth/profile \
   -H "Authorization: Bearer <token>"
 # → 200 { "id": "...", "email": "...", "name": "..." }
+```
+
+#### Send Verification Email
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/send-verification-email \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+# → 200 { "message": "Verification email sent" }
+```
+
+#### Verify Email
+```bash
+curl "http://localhost:3000/api/v1/auth/verify-email?token=<verification-token>"
+# → 200 { "message": "Email verified successfully" }
+```
+
+#### Forgot Password
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+# → 200 { "message": "If email exists, reset link has been sent" }
+```
+
+#### Reset Password
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<reset-token>","newPassword":"NewSecurePass123!"}'
+# → 200 { "message": "Password reset successfully" }
 ```
 
 ### Project Service
